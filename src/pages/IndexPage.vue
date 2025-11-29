@@ -1,18 +1,18 @@
 <template>
   <q-page class="q-pa-md bg-grey-10 text-white">
-    <q-card flat bordered dark class="bg-grey-9 text-white">
+    <q-card flat bordered dark class="bg-dark text-white">
       <q-card-section class="row items-center justify-between">
         <div>
           <div class="text-h6">
             Shared Worker Connections
             <span v-if="currentConnectionId"> - Tab {{ currentConnectionId }}</span>
           </div>
-          <div class="text-caption text-grey-5">
+          <div class="text-caption text-grey-4">
             Live state of tabs connected to the browser shared worker.
           </div>
         </div>
         <div>
-          <q-chip color="info" text-color="white" square>
+          <q-chip color="secondary" text-color="white" square>
             {{ nowFormatted }}
           </q-chip>
         </div>
@@ -29,6 +29,8 @@
         :loading="!rows.length"
         dark
         bordered
+        color="accent"
+        table-header-class="bg-grey-9 text-grey-3"
       >
         <template #body="props">
           <q-tr :props="props" :class="getRowClass(props.row)">
@@ -36,12 +38,12 @@
               {{ props.row.connectionId }}
             </q-td>
             <q-td key="role" :props="props">
-              <q-badge color="primary" text-color="white" v-if="props.row.isPrimary">Primary</q-badge>
-              <q-badge color="grey-6" text-color="white" v-else>Secondary</q-badge>
+              <q-badge color="accent" text-color="white" v-if="props.row.isPrimary">Primary</q-badge>
+              <q-badge color="blue-grey-7" text-color="white" v-else>Secondary</q-badge>
             </q-td>
             <q-td key="isTabHidden" :props="props">
-              <q-badge color="grey-7" v-if="props.row.isTabHidden">Hidden</q-badge>
-              <q-badge color="positive" v-else>Visible</q-badge>
+              <q-badge color="negative" text-color="white" v-if="props.row.isTabHidden">Hidden</q-badge>
+              <q-badge color="positive" text-color="white" v-else>Visible</q-badge>
             </q-td>
             <q-td key="lastPingAt" :props="props">
               {{ formatLastPing(props.row.lastPingAt) }}
@@ -135,7 +137,7 @@ export default defineComponent({
       this.updateRows(event.detail)
     },
     getRowClass(row) {
-      return row.connectionId === this.currentConnectionId ? 'bg-info text-white' : null
+      return row.connectionId === this.currentConnectionId ? 'bg-accent text-white' : null
     },
   },
   mounted() {
