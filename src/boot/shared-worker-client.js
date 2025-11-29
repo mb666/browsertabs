@@ -12,9 +12,38 @@ const createSharedWorker = () => {
 
   worker.port.start()
 
+  const sendPing = () => {
+    worker.port.postMessage({
+      type: 'ping',
+      worker: WORKER_NAME,
+      timestamp: Date.now(),
+    })
+  }
+
   worker.port.addEventListener('message', (event) => {
     if (event?.data?.type === 'worker-ready') {
       console.info(`${WORKER_NAME} ready`, event.data)
+      sendPing()
+      if (typeof window !== 'undefined') {
+        const intervalId = window.setInterval(sendPing, 1000)
+        window.addEventListener(
+          'beforeunload',
+          () => {
+            window.clearInterval(intervalId)
+            worker.port.postMessage({
+              type: 'disconnect',
+              worker: WORKER_NAME,
+            })
+          },
+          { once: true },
+        )
+      }
+      return
+    }
+
+    if (event?.data?.type === 'pong') {
+      worker.connections = event.data.connections ?? []
+      console.info(`${WORKER_NAME} connections`, worker.connections)
     }
   })
 

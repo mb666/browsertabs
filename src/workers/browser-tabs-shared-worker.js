@@ -1,7 +1,7 @@
 /* eslint-env worker */
 
 const WORKER_NAME = 'browser tabs shared worker'
-const connections = new Map()
+const connections = new Map() // port -> { port, id, lastPingAt }
 let nextConnectionId = 1
 
 self.onconnect = (event) => {
@@ -12,8 +12,13 @@ self.onconnect = (event) => {
   }
 
   const connectionId = nextConnectionId++
+  const connectionInfo = {
+    port,
+    id: connectionId,
+    lastPingAt: null,
+  }
 
-  connections.set(port, connectionId)
+  connections.set(port, connectionInfo)
   port.start()
 
   port.postMessage({
@@ -31,12 +36,12 @@ self.onconnect = (event) => {
     }
 
     if (data.type === 'broadcast') {
-      connections.forEach((_, targetPort) => {
-        if (targetPort === port) {
+      connections.forEach((info) => {
+        if (info.port === port) {
           return
         }
 
-        targetPort.postMessage({
+        info.port.postMessage({
           type: 'broadcast',
           worker: WORKER_NAME,
           payload: data.payload ?? null,
@@ -46,18 +51,27 @@ self.onconnect = (event) => {
       return
     }
 
-    if (data.type === 'disconnect') {
-      connections.delete(port)
-      port.close()
-      return
-    }
-
     if (data.type === 'ping') {
+      const info = connections.get(port)
+      if (info) {
+        info.lastPingAt = Date.now()
+      }
+
       port.postMessage({
         type: 'pong',
         worker: WORKER_NAME,
         timestamp: Date.now(),
+        connections: Array.from(connections.values()).map(({ id, lastPingAt }) => ({
+          connectionId: id,
+          lastPingAt,
+        })),
       })
+    }
+
+    if (data.type === 'disconnect') {
+      connections.delete(port)
+      port.close()
+      return
     }
   })
 }
