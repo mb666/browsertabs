@@ -1,7 +1,8 @@
 /* eslint-env worker */
 
 const WORKER_NAME = 'browser tabs shared worker'
-const connections = new Set()
+const connections = new Map()
+let nextConnectionId = 1
 
 self.onconnect = (event) => {
   const [port] = event.ports
@@ -10,12 +11,15 @@ self.onconnect = (event) => {
     return
   }
 
-  connections.add(port)
+  const connectionId = nextConnectionId++
+
+  connections.set(port, connectionId)
   port.start()
 
   port.postMessage({
     type: 'worker-ready',
     worker: WORKER_NAME,
+    connectionId,
     connections: connections.size,
   })
 
@@ -26,14 +30,8 @@ self.onconnect = (event) => {
       return
     }
 
-    if (data.type === 'disconnect') {
-      connections.delete(port)
-      port.close()
-      return
-    }
-
     if (data.type === 'broadcast') {
-      connections.forEach((targetPort) => {
+      connections.forEach((_, targetPort) => {
         if (targetPort === port) {
           return
         }
@@ -45,6 +43,12 @@ self.onconnect = (event) => {
         })
       })
 
+      return
+    }
+
+    if (data.type === 'disconnect') {
+      connections.delete(port)
+      port.close()
       return
     }
 
