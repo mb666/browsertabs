@@ -38,11 +38,15 @@
               {{ props.row.connectionId }}
             </q-td>
             <q-td key="role" :props="props">
-              <q-badge color="accent" text-color="white" v-if="props.row.isPrimary">Primary</q-badge>
+              <q-badge color="primary" text-color="white" v-if="props.row.isPrimary"
+                >Primary</q-badge
+              >
               <q-badge color="blue-grey-7" text-color="white" v-else>Secondary</q-badge>
             </q-td>
             <q-td key="isTabHidden" :props="props">
-              <q-badge color="negative" text-color="white" v-if="props.row.isTabHidden">Hidden</q-badge>
+              <q-badge color="negative" text-color="white" v-if="props.row.isTabHidden"
+                >Hidden</q-badge
+              >
               <q-badge color="positive" text-color="white" v-else>Visible</q-badge>
             </q-td>
             <q-td key="lastPingAt" :props="props">
