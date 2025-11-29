@@ -1,15 +1,20 @@
 <template>
-  <q-page class="q-pa-md">
-    <q-card flat bordered>
+  <q-page class="q-pa-md bg-grey-10 text-white">
+    <q-card flat bordered dark class="bg-grey-9 text-white">
       <q-card-section class="row items-center justify-between">
         <div>
-          <div class="text-h6">Shared Worker Connections</div>
-          <div class="text-caption text-grey-7">
+          <div class="text-h6">
+            Shared Worker Connections
+            <span v-if="currentConnectionId"> - Tab {{ currentConnectionId }}</span>
+          </div>
+          <div class="text-caption text-grey-5">
             Live state of tabs connected to the browser shared worker.
           </div>
         </div>
-        <div class="text-subtitle2 text-weight-medium">
-          {{ nowFormatted }}
+        <div>
+          <q-chip color="info" text-color="white" square>
+            {{ nowFormatted }}
+          </q-chip>
         </div>
       </q-card-section>
       <q-table
@@ -22,6 +27,8 @@
         :pagination="{ rowsPerPage: 0 }"
         hide-bottom
         :loading="!rows.length"
+        dark
+        bordered
       >
         <template #body="props">
           <q-tr :props="props" :class="getRowClass(props.row)">
@@ -55,7 +62,7 @@ import moment from 'moment'
 import { SHARED_WORKER_EVENTS_KEY, SHARED_WORKER_KEY } from 'src/boot/shared-worker-client'
 
 const columns = [
-  { name: 'connectionId', label: 'ID', field: 'connectionId', align: 'left', sortable: true },
+  { name: 'connectionId', label: 'Tab ID', field: 'connectionId', align: 'left', sortable: true },
   { name: 'role', label: 'Role', field: 'isPrimary', align: 'left' },
   { name: 'isTabHidden', label: 'Visibility', field: 'isTabHidden', align: 'left', sortable: true },
   { name: 'lastPingAt', label: 'Last Ping', field: 'lastPingAt', align: 'left', sortable: true },
@@ -75,6 +82,7 @@ export default defineComponent({
       nowFormatted: '',
       nowTimestamp: Date.now(),
       currentConnectionId: null,
+      baseTitle: 'Shared Worker Connections',
     }
   },
   methods: {
@@ -109,17 +117,25 @@ export default defineComponent({
         isPrimary: !!connection.isPrimary,
       }))
     },
+    updatePageTitle() {
+      if (typeof document === 'undefined') {
+        return
+      }
+      const suffix = this.currentConnectionId ? ` - Tab ${this.currentConnectionId}` : ''
+      document.title = `${this.baseTitle}${suffix}`
+    },
     handleReady(event) {
       this.currentConnectionId = event?.detail?.connectionId ?? null
       if (this.worker?.connections) {
         this.updateRows(this.worker.connections)
       }
+      this.updatePageTitle()
     },
     handleConnections(event) {
       this.updateRows(event.detail)
     },
     getRowClass(row) {
-      return row.connectionId === this.currentConnectionId ? 'bg-primary text-white' : null
+      return row.connectionId === this.currentConnectionId ? 'bg-info text-white' : null
     },
   },
   mounted() {
@@ -131,6 +147,7 @@ export default defineComponent({
     if (this.worker?.connectionId) {
       this.currentConnectionId = this.worker.connectionId
     }
+    this.updatePageTitle()
     this.workerEvents?.addEventListener('ready', this.handleReady)
     this.workerEvents?.addEventListener('connections', this.handleConnections)
   },
