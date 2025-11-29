@@ -28,6 +28,10 @@
             <q-td key="connectionId" :props="props">
               {{ props.row.connectionId }}
             </q-td>
+            <q-td key="role" :props="props">
+              <q-badge color="primary" text-color="white" v-if="props.row.isPrimary">Primary</q-badge>
+              <q-badge color="grey-6" text-color="white" v-else>Secondary</q-badge>
+            </q-td>
             <q-td key="isTabHidden" :props="props">
               <q-badge color="grey-7" v-if="props.row.isTabHidden">Hidden</q-badge>
               <q-badge color="positive" v-else>Visible</q-badge>
@@ -52,6 +56,7 @@ import { SHARED_WORKER_EVENTS_KEY, SHARED_WORKER_KEY } from 'src/boot/shared-wor
 
 const columns = [
   { name: 'connectionId', label: 'ID', field: 'connectionId', align: 'left', sortable: true },
+  { name: 'role', label: 'Role', field: 'isPrimary', align: 'left' },
   { name: 'isTabHidden', label: 'Visibility', field: 'isTabHidden', align: 'left', sortable: true },
   { name: 'lastPingAt', label: 'Last Ping', field: 'lastPingAt', align: 'left', sortable: true },
   { name: 'lastPingAgo', label: 'Last Ping Ago', field: 'lastPingAt', align: 'left' },
@@ -101,6 +106,7 @@ export default defineComponent({
         connectionId: connection.connectionId,
         lastPingAt: connection.lastPingAt,
         isTabHidden: connection.isTabHidden,
+        isPrimary: !!connection.isPrimary,
       }))
     },
     handleReady(event) {
