@@ -14,11 +14,18 @@
         flat
         dense
         wrap-cells
+        :pagination="{ rowsPerPage: 0 }"
+        hide-bottom
         :loading="!rows.length"
       >
         <template #body-cell-lastPingAt="props">
           <q-td :props="props">
             {{ formatLastPing(props.value) }}
+          </q-td>
+        </template>
+        <template #body-cell-lastPingAgo="props">
+          <q-td :props="props">
+            {{ formatLastPingAgo(props.value) }}
           </q-td>
         </template>
         <template #body-cell-isTabHidden="props">
@@ -41,6 +48,7 @@ const columns = [
   { name: 'connectionId', label: 'ID', field: 'connectionId', align: 'left', sortable: true },
   { name: 'isTabHidden', label: 'Visibility', field: 'isTabHidden', align: 'left', sortable: true },
   { name: 'lastPingAt', label: 'Last Ping', field: 'lastPingAt', align: 'left', sortable: true },
+  { name: 'lastPingAgo', label: 'Last Ping Ago', field: 'lastPingAt', align: 'left' },
 ]
 
 export default defineComponent({
@@ -61,6 +69,19 @@ export default defineComponent({
         return '—'
       }
       return moment(value).format('HH:mm:ss.SSS')
+    },
+    formatLastPingAgo(value) {
+      if (!value) {
+        return '—'
+      }
+      const diffMs = Date.now() - value
+      if (diffMs < 0) {
+        return '0 ms'
+      }
+      if (diffMs < 1000) {
+        return `${diffMs} ms`
+      }
+      return `${Math.round(diffMs / 1000)} s`
     },
     updateRows(connections) {
       this.rows = (connections ?? []).map((connection) => ({
