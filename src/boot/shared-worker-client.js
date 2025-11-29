@@ -1,6 +1,8 @@
 import { defineBoot } from '#q-app/wrappers'
 
 const WORKER_NAME = 'browser tabs shared worker'
+export const SHARED_WORKER_KEY = Symbol('shared-worker')
+export const SHARED_WORKER_EVENTS_KEY = Symbol('shared-worker-events')
 
 const createSharedWorker = () => {
   const workerUrl = new URL('../workers/browser-tabs-shared-worker.js', import.meta.url)
@@ -13,6 +15,7 @@ const createSharedWorker = () => {
   worker.port.start()
 
   let pingTimeoutId
+  const workerEvents = new EventTarget()
 
   const sendPing = () => {
     worker.port.postMessage({
@@ -72,6 +75,7 @@ const createSharedWorker = () => {
     if (event?.data?.type === 'pong') {
       worker.connections = event.data.connections ?? []
       console.info(`${WORKER_NAME} connections`, worker.connections)
+      workerEvents.dispatchEvent(new CustomEvent('connections', { detail: worker.connections }))
     }
   })
 
@@ -84,6 +88,7 @@ const createSharedWorker = () => {
     worker: WORKER_NAME,
   })
 
+  worker.events = workerEvents
   return worker
 }
 
@@ -95,9 +100,8 @@ export default defineBoot(({ app }) => {
   try {
     const worker = createSharedWorker()
     app.config.globalProperties.$sharedWorker = worker
-    if (typeof window !== 'undefined') {
-      window.__browserTabsSharedWorker = worker
-    }
+    app.provide(SHARED_WORKER_KEY, worker)
+    app.provide(SHARED_WORKER_EVENTS_KEY, worker.events)
   } catch (error) {
     console.error(`Failed to start ${WORKER_NAME}`, error)
   }
