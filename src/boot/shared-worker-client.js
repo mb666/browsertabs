@@ -12,6 +12,8 @@ const createSharedWorker = () => {
 
   worker.port.start()
 
+  let pingTimeoutId
+
   const sendPing = () => {
     worker.port.postMessage({
       type: 'ping',
@@ -20,21 +22,47 @@ const createSharedWorker = () => {
     })
   }
 
+  const schedulePing = () => {
+    if (typeof window === 'undefined') {
+      return
+    }
+    pingTimeoutId = window.setTimeout(() => {
+      sendPing()
+      schedulePing()
+    }, 1000)
+  }
+
+  const reportVisibility = () => {
+    if (typeof document === 'undefined') {
+      return
+    }
+    worker.port.postMessage({
+      type: 'visibility-change',
+      worker: WORKER_NAME,
+      isTabHidden: document.hidden,
+    })
+  }
+
   worker.port.addEventListener('message', (event) => {
     if (event?.data?.type === 'worker-ready') {
       console.info(`${WORKER_NAME} ready`, event.data)
       sendPing()
       if (typeof window !== 'undefined') {
-        const intervalId = window.setInterval(sendPing, 1000)
+        schedulePing()
+        reportVisibility()
+        const onBeforeUnload = () => {
+          if (pingTimeoutId) {
+            window.clearTimeout(pingTimeoutId)
+          }
+          worker.port.postMessage({
+            type: 'disconnect',
+            worker: WORKER_NAME,
+          })
+        }
+        window.addEventListener('visibilitychange', reportVisibility)
         window.addEventListener(
           'beforeunload',
-          () => {
-            window.clearInterval(intervalId)
-            worker.port.postMessage({
-              type: 'disconnect',
-              worker: WORKER_NAME,
-            })
-          },
+          onBeforeUnload,
           { once: true },
         )
       }

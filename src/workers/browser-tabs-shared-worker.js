@@ -1,7 +1,7 @@
 /* eslint-env worker */
 
 const WORKER_NAME = 'browser tabs shared worker'
-const connections = new Map() // port -> { port, id, lastPingAt }
+const connections = new Map() // port -> { port, id, lastPingAt, isTabHidden }
 let nextConnectionId = 1
 
 self.onconnect = (event) => {
@@ -16,6 +16,7 @@ self.onconnect = (event) => {
     port,
     id: connectionId,
     lastPingAt: null,
+    isTabHidden: false,
   }
 
   connections.set(port, connectionInfo)
@@ -51,6 +52,14 @@ self.onconnect = (event) => {
       return
     }
 
+    if (data.type === 'visibility-change') {
+      const info = connections.get(port)
+      if (info && typeof data.isTabHidden === 'boolean') {
+        info.isTabHidden = data.isTabHidden
+      }
+      return
+    }
+
     if (data.type === 'ping') {
       const info = connections.get(port)
       if (info) {
@@ -61,9 +70,10 @@ self.onconnect = (event) => {
         type: 'pong',
         worker: WORKER_NAME,
         timestamp: Date.now(),
-        connections: Array.from(connections.values()).map(({ id, lastPingAt }) => ({
+        connections: Array.from(connections.values()).map(({ id, lastPingAt, isTabHidden }) => ({
           connectionId: id,
           lastPingAt,
+          isTabHidden,
         })),
       })
     }
