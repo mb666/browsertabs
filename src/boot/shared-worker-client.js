@@ -49,6 +49,8 @@ const createSharedWorker = () => {
   worker.port.addEventListener('message', (event) => {
     if (event?.data?.type === 'worker-ready') {
       console.info(`${WORKER_NAME} ready`, event.data)
+      worker.connectionId = event.data.connectionId
+      workerEvents.dispatchEvent(new CustomEvent('ready', { detail: event.data }))
       sendPing()
       if (typeof window !== 'undefined') {
         schedulePing()

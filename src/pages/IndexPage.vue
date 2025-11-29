@@ -1,10 +1,15 @@
 <template>
   <q-page class="q-pa-md">
     <q-card flat bordered>
-      <q-card-section>
-        <div class="text-h6">Shared Worker Connections</div>
-        <div class="text-caption text-grey-7">
-          Live state of tabs connected to the browser shared worker.
+      <q-card-section class="row items-center justify-between">
+        <div>
+          <div class="text-h6">Shared Worker Connections</div>
+          <div class="text-caption text-grey-7">
+            Live state of tabs connected to the browser shared worker.
+          </div>
+        </div>
+        <div class="text-subtitle2 text-weight-medium">
+          {{ nowFormatted }}
         </div>
       </q-card-section>
       <q-table
@@ -18,21 +23,22 @@
         hide-bottom
         :loading="!rows.length"
       >
-        <template #body-cell-lastPingAt="props">
-          <q-td :props="props">
-            {{ formatLastPing(props.value) }}
-          </q-td>
-        </template>
-        <template #body-cell-lastPingAgo="props">
-          <q-td :props="props">
-            {{ formatLastPingAgo(props.value) }}
-          </q-td>
-        </template>
-        <template #body-cell-isTabHidden="props">
-          <q-td :props="props">
-            <q-badge color="grey-7" v-if="props.value">Hidden</q-badge>
-            <q-badge color="positive" v-else>Visible</q-badge>
-          </q-td>
+        <template #body="props">
+          <q-tr :props="props" :class="getRowClass(props.row)">
+            <q-td key="connectionId" :props="props">
+              {{ props.row.connectionId }}
+            </q-td>
+            <q-td key="isTabHidden" :props="props">
+              <q-badge color="grey-7" v-if="props.row.isTabHidden">Hidden</q-badge>
+              <q-badge color="positive" v-else>Visible</q-badge>
+            </q-td>
+            <q-td key="lastPingAt" :props="props">
+              {{ formatLastPing(props.row.lastPingAt) }}
+            </q-td>
+            <q-td key="lastPingAgo" :props="props">
+              {{ formatLastPingAgo(props.row.lastPingAt) }}
+            </q-td>
+          </q-tr>
         </template>
       </q-table>
     </q-card>
@@ -61,20 +67,27 @@ export default defineComponent({
     return {
       columns,
       rows: [],
+      nowFormatted: '',
+      nowTimestamp: Date.now(),
+      currentConnectionId: null,
     }
   },
   methods: {
     formatLastPing(value) {
       if (!value) {
-        return '—'
+        return '-'
       }
       return moment(value).format('HH:mm:ss.SSS')
     },
+    updateNow() {
+      this.nowTimestamp = Date.now()
+      this.nowFormatted = moment(this.nowTimestamp).format('HH:mm:ss')
+    },
     formatLastPingAgo(value) {
       if (!value) {
-        return '—'
+        return '-'
       }
-      const diffMs = Date.now() - value
+      const diffMs = this.nowTimestamp - value
       if (diffMs < 0) {
         return '0 ms'
       }
@@ -90,17 +103,36 @@ export default defineComponent({
         isTabHidden: connection.isTabHidden,
       }))
     },
+    handleReady(event) {
+      this.currentConnectionId = event?.detail?.connectionId ?? null
+      if (this.worker?.connections) {
+        this.updateRows(this.worker.connections)
+      }
+    },
     handleConnections(event) {
       this.updateRows(event.detail)
     },
+    getRowClass(row) {
+      return row.connectionId === this.currentConnectionId ? 'bg-primary text-white' : null
+    },
   },
   mounted() {
+    this.updateNow()
+    this.nowInterval = window.setInterval(this.updateNow, 1000)
     if (this.worker?.connections) {
       this.updateRows(this.worker.connections)
     }
+    if (this.worker?.connectionId) {
+      this.currentConnectionId = this.worker.connectionId
+    }
+    this.workerEvents?.addEventListener('ready', this.handleReady)
     this.workerEvents?.addEventListener('connections', this.handleConnections)
   },
   beforeUnmount() {
+    if (this.nowInterval) {
+      window.clearInterval(this.nowInterval)
+    }
+    this.workerEvents?.removeEventListener('ready', this.handleReady)
     this.workerEvents?.removeEventListener('connections', this.handleConnections)
   },
 })
