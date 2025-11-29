@@ -1,8 +1,8 @@
 {
   "name": "browsertabs",
   "version": "0.0.1",
-  "description": "A Quasar Project",
-  "productName": "browsertabs",
+  "description": "demonstrate how responsive inactive browser tabs are",
+  "productName": "browser tabs",
   "author": "Maciej Borzecki",
   "type": "module",
   "private": true,
