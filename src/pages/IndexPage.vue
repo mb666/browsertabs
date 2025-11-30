@@ -151,7 +151,7 @@ export default defineComponent({
     sparklineOptions() {
       return {
         barColor: '#00b4d8',
-        tooltipFormat: 'tab ping: {{value}}',
+        tooltipFormat: 'tab ping: {{value}}ms',
       }
     },
   },
