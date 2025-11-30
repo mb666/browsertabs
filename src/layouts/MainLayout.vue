@@ -4,7 +4,9 @@
       <q-toolbar>
         <q-toolbar-title> browser tabs </q-toolbar-title>
 
-        <div>Quasar v{{ $q.version }}</div>
+        <q-space />
+
+        <div class="text-caption text-weight-medium">v{{ appVersion }}</div>
       </q-toolbar>
     </q-header>
 
@@ -15,10 +17,18 @@
 </template>
 
 <script>
+/* global __APP_VERSION__ */
 import { defineComponent } from 'vue'
 
 export default defineComponent({
   name: 'MainLayout',
+
+  data() {
+    return {
+      appVersion:
+        typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev',
+    }
+  },
 
   mounted() {
     this.$q.dark.set(true)
