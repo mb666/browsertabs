@@ -1,9 +1,17 @@
 /* eslint-env worker */
 
 const WORKER_NAME = 'browser tabs shared worker'
+const MAX_PINGS = 100
 const connections = new Map() // port -> { port, id, connectedAt, pings, isTabHidden, isPrimary }
 let nextConnectionId = 1
 let primaryConnectionId = null
+
+const setPrimary = (connectionId) => {
+  primaryConnectionId = connectionId
+  connections.forEach((info) => {
+    info.isPrimary = info.id === primaryConnectionId
+  })
+}
 
 const selectPrimary = (preferredActiveId = null) => {
   const all = Array.from(connections.values())
@@ -19,19 +27,39 @@ const selectPrimary = (preferredActiveId = null) => {
     : null
   const firstActive = preferredActive ?? all.find((info) => !info.isTabHidden)
 
-  if (primaryConnectionId) {
+  if (primaryConnectionId && firstActive) {
     const primaryInfo = all.find((info) => info.id === primaryConnectionId)
-    if (primaryInfo && primaryInfo.isTabHidden && firstActive) {
-      primaryConnectionId = firstActive.id
+    if (primaryInfo?.isTabHidden) {
+      setPrimary(firstActive.id)
+      return
     }
-  } else if (firstActive) {
-    primaryConnectionId = firstActive.id
-  } else if (all.length > 0) {
-    primaryConnectionId = all[0].id
   }
 
-  connections.forEach((info) => {
-    info.isPrimary = info.id === primaryConnectionId
+  if (!primaryConnectionId) {
+    if (firstActive) {
+      setPrimary(firstActive.id)
+    } else if (all.length > 0) {
+      setPrimary(all[0].id)
+    }
+  } else {
+    setPrimary(primaryConnectionId)
+  }
+}
+
+const toConnectionPayload = (info) => ({
+  connectionId: info.id,
+  connectedAt: info.connectedAt,
+  pings: info.pings,
+  isTabHidden: info.isTabHidden,
+  isPrimary: info.isPrimary,
+})
+
+const broadcastConnections = (port, worker) => {
+  port.postMessage({
+    type: 'pong',
+    worker,
+    timestamp: Date.now(),
+    connections: Array.from(connections.values()).map(toConnectionPayload),
   })
 }
 
@@ -66,67 +94,57 @@ self.onconnect = (event) => {
 
   port.addEventListener('message', (messageEvent) => {
     const { data } = messageEvent
-
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== 'object' || typeof data.type !== 'string') {
       return
     }
 
-    if (data.type === 'broadcast') {
-      connections.forEach((info) => {
-        if (info.port === port) {
-          return
-        }
+    switch (data.type) {
+      case 'broadcast': {
+        connections.forEach((info) => {
+          if (info.port === port) {
+            return
+          }
 
-        info.port.postMessage({
-          type: 'broadcast',
-          worker: WORKER_NAME,
-          payload: data.payload ?? null,
+          info.port.postMessage({
+            type: 'broadcast',
+            worker: WORKER_NAME,
+            payload: data.payload ?? null,
+          })
         })
-      })
-
-      return
-    }
-
-    if (data.type === 'visibility-change') {
-      const info = connections.get(port)
-      if (info && typeof data.isTabHidden === 'boolean') {
-        info.isTabHidden = data.isTabHidden
+        break
       }
-      selectPrimary(info && !info.isTabHidden ? info.id : null)
-      return
-    }
 
-    if (data.type === 'ping') {
-      const info = connections.get(port)
-      if (info) {
-        info.pings.push(Date.now())
-        if (info.pings.length > 100) {
-          info.pings.shift()
+      case 'visibility-change': {
+        const info = connections.get(port)
+        if (info && typeof data.isTabHidden === 'boolean') {
+          info.isTabHidden = data.isTabHidden
         }
+        selectPrimary(info && !info.isTabHidden ? info.id : null)
+        break
       }
-      selectPrimary()
 
-      port.postMessage({
-        type: 'pong',
-        worker: WORKER_NAME,
-        timestamp: Date.now(),
-        connections: Array.from(connections.values()).map(({
-          id, connectedAt, pings, isTabHidden, isPrimary,
-        }) => ({
-          connectionId: id,
-          connectedAt,
-          pings,
-          isTabHidden,
-          isPrimary,
-        })),
-      })
-    }
+      case 'ping': {
+        const info = connections.get(port)
+        if (info) {
+          info.pings.push(Date.now())
+          if (info.pings.length > MAX_PINGS) {
+            info.pings.shift()
+          }
+        }
+        selectPrimary()
+        broadcastConnections(port, WORKER_NAME)
+        break
+      }
 
-    if (data.type === 'disconnect') {
-      connections.delete(port)
-      selectPrimary()
-      port.close()
-      return
+      case 'disconnect': {
+        connections.delete(port)
+        selectPrimary()
+        port.close()
+        break
+      }
+
+      default:
+        break
     }
   })
 }
