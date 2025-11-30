@@ -202,15 +202,14 @@ export default defineComponent({
     },
     getPingSeries(pings) {
       if (!Array.isArray(pings) || pings.length < 2) {
-        return Array(100).fill(0)
+        return Array(100).fill(null)
       }
       const series = []
       for (let i = 1; i < pings.length; i += 1) {
         series.push(pings[i] - pings[i - 1])
       }
-      const padValue = series[0]
       while (series.length < 100) {
-        series.unshift(padValue)
+        series.unshift(null)
       }
       return series.slice(-100)
     },
