@@ -1,7 +1,7 @@
 /* eslint-env worker */
 
 const WORKER_NAME = 'browser tabs shared worker'
-const connections = new Map() // port -> { port, id, lastPingAt, isTabHidden, isPrimary }
+const connections = new Map() // port -> { port, id, connectedAt, pings, isTabHidden, isPrimary }
 let nextConnectionId = 1
 let primaryConnectionId = null
 
@@ -46,7 +46,8 @@ self.onconnect = (event) => {
   const connectionInfo = {
     port,
     id: connectionId,
-    lastPingAt: null,
+    connectedAt: Date.now(),
+    pings: [],
     isTabHidden: false,
     isPrimary: false,
   }
@@ -59,6 +60,7 @@ self.onconnect = (event) => {
     type: 'worker-ready',
     worker: WORKER_NAME,
     connectionId,
+    connectedAt: connectionInfo.connectedAt,
     connections: connections.size,
   })
 
@@ -97,7 +99,10 @@ self.onconnect = (event) => {
     if (data.type === 'ping') {
       const info = connections.get(port)
       if (info) {
-        info.lastPingAt = Date.now()
+        info.pings.push(Date.now())
+        if (info.pings.length > 100) {
+          info.pings.shift()
+        }
       }
       selectPrimary()
 
@@ -105,9 +110,12 @@ self.onconnect = (event) => {
         type: 'pong',
         worker: WORKER_NAME,
         timestamp: Date.now(),
-        connections: Array.from(connections.values()).map(({ id, lastPingAt, isTabHidden, isPrimary }) => ({
+        connections: Array.from(connections.values()).map(({
+          id, connectedAt, pings, isTabHidden, isPrimary,
+        }) => ({
           connectionId: id,
-          lastPingAt,
+          connectedAt,
+          pings,
           isTabHidden,
           isPrimary,
         })),

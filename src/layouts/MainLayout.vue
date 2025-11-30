@@ -2,11 +2,11 @@
   <q-layout view="lHh Lpr lFf" class="bg-grey-10 text-white" dark>
     <q-header elevated class="bg-grey-9 text-white">
       <q-toolbar>
-        <q-toolbar-title> browser tabs </q-toolbar-title>
+        <q-toolbar-title> Browser Tabs </q-toolbar-title>
 
         <q-space />
 
-        <div class="text-caption text-weight-medium">v{{ appVersion }}</div>
+        <q-chip color="primary" text-color="white" square> v{{ appVersion }} </q-chip>
       </q-toolbar>
     </q-header>
 
@@ -25,8 +25,7 @@ export default defineComponent({
 
   data() {
     return {
-      appVersion:
-        typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev',
+      appVersion: typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev',
     }
   },
 

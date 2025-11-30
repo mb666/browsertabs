@@ -8,11 +8,12 @@
             <span v-if="currentConnectionId"> - Tab {{ currentConnectionId }}</span>
           </div>
           <div class="text-caption text-grey-4">
-            Live state of tabs connected to the browser shared worker.
+            Live state of tabs connected to the browser shared worker. Below table helps to
+            understand how quickly your browser reduces resources on inactive tabs.
           </div>
         </div>
         <div>
-          <q-chip color="secondary" text-color="white" square>
+          <q-chip color="primary" text-color="white" square>
             {{ nowFormatted }}
           </q-chip>
         </div>
@@ -49,8 +50,11 @@
               >
               <q-badge color="positive" text-color="white" v-else>Visible</q-badge>
             </q-td>
-            <q-td key="lastPingAt" :props="props">
-              {{ formatLastPing(props.row.lastPingAt) }}
+            <q-td key="connectedAgo" :props="props">
+              {{ formatConnectedAgo(props.row.connectedAt) }}
+            </q-td>
+            <q-td key="lastPingCount" :props="props">
+              {{ props.row.lastPingCount ?? 0 }}
             </q-td>
             <q-td key="lastPingAgo" :props="props">
               {{ formatLastPingAgo(props.row.lastPingAt) }}
@@ -69,9 +73,10 @@ import { SHARED_WORKER_EVENTS_KEY, SHARED_WORKER_KEY } from 'src/boot/shared-wor
 
 const columns = [
   { name: 'connectionId', label: 'Tab ID', field: 'connectionId', align: 'left', sortable: true },
-  { name: 'role', label: 'Role', field: 'isPrimary', align: 'left' },
-  { name: 'isTabHidden', label: 'Visibility', field: 'isTabHidden', align: 'left', sortable: true },
-  { name: 'lastPingAt', label: 'Last Ping', field: 'lastPingAt', align: 'left', sortable: true },
+  { name: 'role', label: 'Tab Role', field: 'isPrimary', align: 'left' },
+  { name: 'isTabHidden', label: 'Browser Tab Visibility', field: 'isTabHidden', align: 'left', sortable: true },
+  { name: 'connectedAgo', label: 'Connected', field: 'connectedAt', align: 'left' },
+  { name: 'lastPingCount', label: 'Last Ping Count', field: 'lastPingCount', align: 'left' },
   { name: 'lastPingAgo', label: 'Last Ping Ago', field: 'lastPingAt', align: 'left' },
 ]
 
@@ -98,6 +103,24 @@ export default defineComponent({
       }
       return moment(value).format('HH:mm:ss.SSS')
     },
+    formatConnectedAgo(value) {
+      if (!value) {
+        return '-'
+      }
+      const diffMs = this.nowTimestamp - value
+      if (diffMs < 0) {
+        return '0 ms ago'
+      }
+      if (diffMs < 1000) {
+        return `${diffMs} ms ago`
+      }
+      if (diffMs < 60_000) {
+        return `${Math.round(diffMs / 1000)} s ago`
+      }
+      const minutes = Math.floor(diffMs / 60_000)
+      const seconds = Math.round((diffMs % 60_000) / 1000)
+      return `${minutes}m ${seconds}s ago`
+    },
     updateNow() {
       this.nowTimestamp = Date.now()
       this.nowFormatted = moment(this.nowTimestamp).format('HH:mm:ss')
@@ -118,7 +141,12 @@ export default defineComponent({
     updateRows(connections) {
       this.rows = (connections ?? []).map((connection) => ({
         connectionId: connection.connectionId,
-        lastPingAt: connection.lastPingAt,
+        connectedAt: connection.connectedAt,
+        lastPingAt:
+          Array.isArray(connection.pings) && connection.pings.length
+            ? connection.pings[connection.pings.length - 1]
+            : null,
+        lastPingCount: Array.isArray(connection.pings) ? connection.pings.length : 0,
         isTabHidden: connection.isTabHidden,
         isPrimary: !!connection.isPrimary,
       }))
@@ -141,7 +169,7 @@ export default defineComponent({
       this.updateRows(event.detail)
     },
     getRowClass(row) {
-      return row.connectionId === this.currentConnectionId ? 'bg-accent text-white' : null
+      return row.connectionId === this.currentConnectionId ? 'bg-blue-grey-9 text-white' : null
     },
   },
   mounted() {
