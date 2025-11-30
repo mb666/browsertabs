@@ -2,6 +2,7 @@
 // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file
 
 import { defineConfig } from '#q-app/wrappers'
+import pkg from './package.json' assert { type: 'json' }
 
 export default defineConfig((/* ctx */) => {
   return {
@@ -44,10 +45,12 @@ export default defineConfig((/* ctx */) => {
 
       // rebuildCache: true, // rebuilds Vite/linter/etc cache on startup
 
-      // publicPath: '/',
+      publicPath: '/browsertabs/',
       // analyze: true,
       // env: {},
-      // rawDefine: {}
+      rawDefine: {
+        __APP_VERSION__: JSON.stringify(pkg.version),
+      },
       // ignorePublicFolder: true,
       // minify: false,
       // polyfillModulePreload: true,
