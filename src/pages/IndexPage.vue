@@ -15,9 +15,7 @@
           </div>
         </div>
         <div>
-          <q-chip color="primary" text-color="white" square>
-            {{ nowFormatted }}
-          </q-chip>
+          <q-chip color="primary" text-color="white" square> Time {{ nowFormatted }} </q-chip>
         </div>
       </q-card-section>
       <q-table
@@ -54,11 +52,9 @@
               <q-badge color="positive" text-color="white" v-else>Visible</q-badge>
             </q-td>
             <q-td key="connectedAgo" :props="props">
-              {{ formatConnectedAgo(props.row.connectedAt) }}
+              {{ formatAgo(props.row.connectedAt) }}
             </q-td>
-            <q-td key="lastPingAgo" :props="props">
-              {{ formatLastPingAgo(props.row.lastPingAt) }}
-            </q-td>
+            <q-td key="lastPing" :props="props"> {{ formatLastPing(props.row.lastPing) }}ms </q-td>
             <q-td key="pingSparkline" :props="props">
               <Sparkline
                 v-if="Array.isArray(props.row.pingSeries) && props.row.pingSeries.length"
@@ -81,6 +77,7 @@
 import { defineComponent } from 'vue'
 import { Sparkline } from 'sparkline-vue'
 import moment from 'moment'
+import numbro from 'numbro'
 import { SHARED_WORKER_EVENTS_KEY, SHARED_WORKER_KEY } from 'src/boot/shared-worker-client'
 
 const columns = [
@@ -88,11 +85,17 @@ const columns = [
     name: 'connectionId',
     label: 'Tab ID',
     field: 'connectionId',
-    align: 'left',
+    align: 'right',
     sortable: true,
     style: 'width: 100px; min-width: 100px;',
   },
-  { name: 'role', label: 'Tab Role', field: 'isPrimary', align: 'left', style: 'width: 100px; min-width: 100px;' },
+  {
+    name: 'role',
+    label: 'Tab Role',
+    field: 'isPrimary',
+    align: 'left',
+    style: 'width: 100px; min-width: 100px;',
+  },
   {
     name: 'isTabHidden',
     label: 'Browser Tab Visibility',
@@ -101,8 +104,20 @@ const columns = [
     sortable: true,
     style: 'width: 150px; min-width: 150px;',
   },
-  { name: 'connectedAgo', label: 'Connected', field: 'connectedAt', align: 'left', style: 'width: 100px; min-width: 100px;' },
-  { name: 'lastPingAgo', label: 'Last Ping Ago', field: 'lastPingAt', align: 'left', style: 'width: 100px; min-width: 100px;' },
+  {
+    name: 'connectedAgo',
+    label: 'Connected',
+    field: 'connectedAt',
+    align: 'right',
+    style: 'width: 100px; min-width: 100px;',
+  },
+  {
+    name: 'lastPing',
+    label: 'Last Ping',
+    field: 'lastPing',
+    align: 'right',
+    style: 'width: 100px; min-width: 100px;',
+  },
   {
     name: 'pingSparkline',
     label: 'Ping Sparkline',
@@ -141,72 +156,63 @@ export default defineComponent({
     },
   },
   methods: {
-    formatLastPing(value) {
-      if (!value) {
-        return '-'
-      }
-      return moment(value).format('HH:mm:ss.SSS')
-    },
-    formatConnectedAgo(value) {
+    formatAgo(value) {
       if (!value) {
         return '-'
       }
       const diffMs = this.nowTimestamp - value
       if (diffMs < 0) {
-        return '0 ms ago'
+        return '0ms ago'
       }
       if (diffMs < 1000) {
-        return `${diffMs} ms ago`
+        return `${diffMs}ms ago`
       }
       if (diffMs < 60_000) {
-        return `${Math.round(diffMs / 1000)} s ago`
+        return `${Math.round(diffMs / 1000)}s ago`
       }
       const minutes = Math.floor(diffMs / 60_000)
       const seconds = Math.round((diffMs % 60_000) / 1000)
       return `${minutes}m ${seconds}s ago`
     },
-    updateNow() {
-      this.nowTimestamp = Date.now()
-      this.nowFormatted = moment(this.nowTimestamp).format('HH:mm:ss')
-    },
-    formatLastPingAgo(value) {
+    formatLastPing(value) {
       if (!value) {
         return '-'
       }
-      const diffMs = this.nowTimestamp - value
-      if (diffMs < 0) {
-        return '0 ms'
-      }
-      if (diffMs < 1000) {
-        return `${diffMs} ms`
-      }
-      return `${Math.round(diffMs / 1000)} s`
+      return numbro(value).format({ mantissa: 0, thousandSeparated: true })
+    },
+    updateNow() {
+      this.nowTimestamp = Date.now()
+      this.nowFormatted = moment(this.nowTimestamp).format('HH:mm:ss')
     },
     updateRows(connections) {
       this.rows = (connections ?? []).map((connection) => ({
         connectionId: connection.connectionId,
         connectedAt: connection.connectedAt,
-        lastPingAt: this.getLastPing(connection.pings),
+        lastPing: this.getLastPing(connection.pings),
         pingSeries: this.getPingSeries(connection.pings),
         isTabHidden: connection.isTabHidden,
         isPrimary: !!connection.isPrimary,
       }))
     },
     getLastPing(pings) {
-      if (!Array.isArray(pings) || !pings.length) {
+      if (!Array.isArray(pings) || pings.length < 2) {
         return null
       }
-      return pings[pings.length - 1]
+      return pings[pings.length - 1] - pings[pings.length - 2]
     },
     getPingSeries(pings) {
       if (!Array.isArray(pings) || pings.length < 2) {
-        return []
+        return Array(100).fill(0)
       }
       const series = []
       for (let i = 1; i < pings.length; i += 1) {
         series.push(pings[i] - pings[i - 1])
       }
-      return series
+      const padValue = series[0]
+      while (series.length < 100) {
+        series.unshift(padValue)
+      }
+      return series.slice(-100)
     },
     updatePageTitle() {
       if (typeof document === 'undefined') {
