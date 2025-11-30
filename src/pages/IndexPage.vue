@@ -1,6 +1,6 @@
 <template>
   <q-page class="q-pa-md bg-grey-10 text-white">
-    <q-card flat bordered dark class="bg-dark text-white">
+    <q-card flat dark class="bg-dark text-white">
       <q-card-section class="row items-center justify-between">
         <div>
           <div class="text-h6">
@@ -8,8 +8,10 @@
             <span v-if="currentConnectionId"> - Tab {{ currentConnectionId }}</span>
           </div>
           <div class="text-caption text-grey-4">
-            Live state of tabs connected to the browser shared worker. Below table helps to
-            understand how quickly your browser reduces resources on inactive tabs.
+            Shows live state of tabs connected to the browser shared worker. Helps to understand how
+            quickly your browser reduces performance on inactive tabs. Keeps track of tab
+            visibility. Nominates the oldest active tab as primary. Keeps track of connection times
+            and pings.
           </div>
         </div>
         <div>
@@ -19,6 +21,7 @@
         </div>
       </q-card-section>
       <q-table
+        ref="connectionsTable"
         :rows="rows"
         :columns="columns"
         row-key="connectionId"
@@ -53,11 +56,19 @@
             <q-td key="connectedAgo" :props="props">
               {{ formatConnectedAgo(props.row.connectedAt) }}
             </q-td>
-            <q-td key="lastPingCount" :props="props">
-              {{ props.row.lastPingCount ?? 0 }}
-            </q-td>
             <q-td key="lastPingAgo" :props="props">
               {{ formatLastPingAgo(props.row.lastPingAt) }}
+            </q-td>
+            <q-td key="pingSparkline" :props="props">
+              <Sparkline
+                v-if="Array.isArray(props.row.pingSeries) && props.row.pingSeries.length"
+                :data="props.row.pingSeries"
+                type="bar"
+                :width="sparklineWidth"
+                :height="32"
+                :options="sparklineOptions"
+              />
+              <div v-else class="text-grey-5">-</div>
             </q-td>
           </q-tr>
         </template>
@@ -68,20 +79,44 @@
 
 <script>
 import { defineComponent } from 'vue'
+import { Sparkline } from 'sparkline-vue'
 import moment from 'moment'
 import { SHARED_WORKER_EVENTS_KEY, SHARED_WORKER_KEY } from 'src/boot/shared-worker-client'
 
 const columns = [
-  { name: 'connectionId', label: 'Tab ID', field: 'connectionId', align: 'left', sortable: true },
-  { name: 'role', label: 'Tab Role', field: 'isPrimary', align: 'left' },
-  { name: 'isTabHidden', label: 'Browser Tab Visibility', field: 'isTabHidden', align: 'left', sortable: true },
-  { name: 'connectedAgo', label: 'Connected', field: 'connectedAt', align: 'left' },
-  { name: 'lastPingCount', label: 'Last Ping Count', field: 'lastPingCount', align: 'left' },
-  { name: 'lastPingAgo', label: 'Last Ping Ago', field: 'lastPingAt', align: 'left' },
+  {
+    name: 'connectionId',
+    label: 'Tab ID',
+    field: 'connectionId',
+    align: 'left',
+    sortable: true,
+    style: 'width: 100px; min-width: 100px;',
+  },
+  { name: 'role', label: 'Tab Role', field: 'isPrimary', align: 'left', style: 'width: 100px; min-width: 100px;' },
+  {
+    name: 'isTabHidden',
+    label: 'Browser Tab Visibility',
+    field: 'isTabHidden',
+    align: 'left',
+    sortable: true,
+    style: 'width: 150px; min-width: 150px;',
+  },
+  { name: 'connectedAgo', label: 'Connected', field: 'connectedAt', align: 'left', style: 'width: 100px; min-width: 100px;' },
+  { name: 'lastPingAgo', label: 'Last Ping Ago', field: 'lastPingAt', align: 'left', style: 'width: 100px; min-width: 100px;' },
+  {
+    name: 'pingSparkline',
+    label: 'Ping Sparkline',
+    field: 'pingSeries',
+    align: 'left',
+    style: 'width: auto;',
+  },
 ]
 
 export default defineComponent({
   name: 'IndexPage',
+  components: {
+    Sparkline,
+  },
   inject: {
     worker: { from: SHARED_WORKER_KEY, default: null },
     workerEvents: { from: SHARED_WORKER_EVENTS_KEY, default: null },
@@ -94,7 +129,16 @@ export default defineComponent({
       nowTimestamp: Date.now(),
       currentConnectionId: null,
       baseTitle: 'Shared Worker Connections',
+      sparklineWidth: 120,
     }
+  },
+  computed: {
+    sparklineOptions() {
+      return {
+        barColor: '#00b4d8',
+        tooltipFormat: 'tab ping: {{value}}',
+      }
+    },
   },
   methods: {
     formatLastPing(value) {
@@ -142,14 +186,27 @@ export default defineComponent({
       this.rows = (connections ?? []).map((connection) => ({
         connectionId: connection.connectionId,
         connectedAt: connection.connectedAt,
-        lastPingAt:
-          Array.isArray(connection.pings) && connection.pings.length
-            ? connection.pings[connection.pings.length - 1]
-            : null,
-        lastPingCount: Array.isArray(connection.pings) ? connection.pings.length : 0,
+        lastPingAt: this.getLastPing(connection.pings),
+        pingSeries: this.getPingSeries(connection.pings),
         isTabHidden: connection.isTabHidden,
         isPrimary: !!connection.isPrimary,
       }))
+    },
+    getLastPing(pings) {
+      if (!Array.isArray(pings) || !pings.length) {
+        return null
+      }
+      return pings[pings.length - 1]
+    },
+    getPingSeries(pings) {
+      if (!Array.isArray(pings) || pings.length < 2) {
+        return []
+      }
+      const series = []
+      for (let i = 1; i < pings.length; i += 1) {
+        series.push(pings[i] - pings[i - 1])
+      }
+      return series
     },
     updatePageTitle() {
       if (typeof document === 'undefined') {
@@ -164,12 +221,22 @@ export default defineComponent({
         this.updateRows(this.worker.connections)
       }
       this.updatePageTitle()
+      this.updateSparklineWidth()
     },
     handleConnections(event) {
       this.updateRows(event.detail)
+      this.updateSparklineWidth()
     },
     getRowClass(row) {
       return row.connectionId === this.currentConnectionId ? 'bg-blue-grey-9 text-white' : null
+    },
+    updateSparklineWidth() {
+      const tableWidth =
+        this.$refs.connectionsTable?.$el?.clientWidth ||
+        (typeof window !== 'undefined' ? window.innerWidth : 400)
+      const fixedColsWidth = 100 + 100 + 150 + 100 + 100
+      const available = tableWidth - fixedColsWidth - 40 // account for padding/borders
+      this.sparklineWidth = Math.max(120, available)
     },
   },
   mounted() {
@@ -182,8 +249,10 @@ export default defineComponent({
       this.currentConnectionId = this.worker.connectionId
     }
     this.updatePageTitle()
+    this.updateSparklineWidth()
     this.workerEvents?.addEventListener('ready', this.handleReady)
     this.workerEvents?.addEventListener('connections', this.handleConnections)
+    window.addEventListener('resize', this.updateSparklineWidth)
   },
   beforeUnmount() {
     if (this.nowInterval) {
@@ -191,6 +260,7 @@ export default defineComponent({
     }
     this.workerEvents?.removeEventListener('ready', this.handleReady)
     this.workerEvents?.removeEventListener('connections', this.handleConnections)
+    window.removeEventListener('resize', this.updateSparklineWidth)
   },
 })
 </script>

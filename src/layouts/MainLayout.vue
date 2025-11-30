@@ -1,8 +1,8 @@
 <template>
   <q-layout view="lHh Lpr lFf" class="bg-grey-10 text-white" dark>
-    <q-header elevated class="bg-grey-9 text-white">
+    <q-header class="bg-grey-10 text-white shadow-1">
       <q-toolbar>
-        <q-toolbar-title> Browser Tabs </q-toolbar-title>
+        <q-toolbar-title>Browser Tabs</q-toolbar-title>
 
         <q-space />
 
