@@ -32,7 +32,7 @@
           {{ formatAgo(props.row.connectedAt) }}
         </q-td>
         <q-td key="lastPing" :props="props">
-          {{ formatLastPing(props.row.lastPing) }}ms
+          {{ formatLastPing(props.row.lastPing) }}
         </q-td>
         <q-td key="pingSparkline" :props="props">
           <Sparkline
@@ -53,7 +53,7 @@
 <script>
 import { defineComponent } from 'vue'
 import { Sparkline } from 'sparkline-vue'
-import numbro from 'numbro'
+import { formatAgo, formatLastPing } from 'src/utils/formatHelper'
 
 const columns = [
   {
@@ -142,28 +142,10 @@ export default defineComponent({
   },
   methods: {
     formatAgo(value) {
-      if (!value) {
-        return '-'
-      }
-      const diffMs = this.nowTimestamp - value
-      if (diffMs < 0) {
-        return '0ms ago'
-      }
-      if (diffMs < 1000) {
-        return `${diffMs}ms ago`
-      }
-      if (diffMs < 60_000) {
-        return `${Math.round(diffMs / 1000)}s ago`
-      }
-      const minutes = Math.floor(diffMs / 60_000)
-      const seconds = Math.round((diffMs % 60_000) / 1000)
-      return `${minutes}m ${seconds}s ago`
+      return formatAgo(value, this.nowTimestamp)
     },
     formatLastPing(value) {
-      if (!value) {
-        return '-'
-      }
-      return numbro(value).format({ mantissa: 0, thousandSeparated: true })
+      return formatLastPing(value)
     },
     getRowClass(row) {
       return row.connectionId === this.currentConnectionId ? 'bg-blue-grey-9 text-white' : null

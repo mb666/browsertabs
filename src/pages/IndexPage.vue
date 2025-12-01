@@ -19,10 +19,12 @@
         </div>
       </q-card-section>
       <TabsTable
+        class="q-my-xl"
         :rows="rows"
         :current-connection-id="currentConnectionId"
         :now-timestamp="nowTimestamp"
       />
+      <TabsDiagram class="q-mt-xl" :rows="rows" :now-timestamp="nowTimestamp" />
     </q-card>
   </q-page>
 </template>
@@ -31,12 +33,14 @@
 import { defineComponent } from 'vue'
 import moment from 'moment'
 import TabsTable from 'src/components/TabsTable.vue'
+import TabsDiagram from 'src/components/TabsDiagram.vue'
 import { SHARED_WORKER_EVENTS_KEY, SHARED_WORKER_KEY } from 'src/boot/shared-worker-client'
 
 export default defineComponent({
   name: 'IndexPage',
   components: {
     TabsTable,
+    TabsDiagram,
   },
   inject: {
     worker: { from: SHARED_WORKER_KEY, default: null },
