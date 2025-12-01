@@ -1,0 +1,85 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - '**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      semver: ${{ steps.gitversion.outputs.semVer }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.11.1
+          cache: npm
+
+      - name: Install GitVersion
+        uses: gittools/actions/gitversion/setup@v0
+        with:
+          versionSpec: '6.0.x'
+
+      - name: Determine SemVer
+        id: gitversion
+        uses: gittools/actions/gitversion/execute@v0
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply version to package files
+        run: npm version ${{ steps.gitversion.outputs.semVer }} --no-git-tag-version
+
+      - name: Publish version to summary
+        env:
+          SEMVER: ${{ steps.gitversion.outputs.semVer }}
+        run: |
+          echo "SemVer: ${SEMVER}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Annotate version
+        env:
+          SEMVER: ${{ steps.gitversion.outputs.semVer }}
+        run: |
+          echo "::notice title=SemVer::${SEMVER}"
+
+      - name: Build site
+        run: npm run build
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload build artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/spa
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Show version being deployed
+        run: echo "Deploying version ${{ needs.build.outputs.semver }}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
