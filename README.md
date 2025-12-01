@@ -19,5 +19,4 @@ https://mb666.github.io/browsertabs/
 - [x] deploy to github pages
 - [x] add "Connected" column to the grid
 - [x] add sparkline https://github.com/iclaxton/sparkline-vue
-- [ ] create sql lite database in primary
-- [ ] load some data
+- [x] add [vueflow](https://vueflow.dev/) diagram showing the same data in a diagram
