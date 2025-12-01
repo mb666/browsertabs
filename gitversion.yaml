@@ -1,0 +1,21 @@
+mode: ContinuousDeployment
+branches:
+  main:
+    label: ''
+    increment: Patch
+    is-mainline: true
+  develop:
+    label: preview
+    increment: Minor
+    track-merge-target: true
+  feature:
+    regex: feature[/-]
+    label: feature
+    increment: Inherit
+    source-branches:
+      - develop
+      - main
+ignore:
+  sha: []
+commit-message-incrementing: Enabled
+merge-message-strategy: MergeMessageOnly
