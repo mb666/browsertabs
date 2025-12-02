@@ -20,3 +20,5 @@ https://mb666.github.io/browsertabs/
 - [x] add "Connected" column to the grid
 - [x] add sparkline https://github.com/iclaxton/sparkline-vue
 - [x] add [vueflow](https://vueflow.dev/) diagram showing the same data in a diagram
+
+fork/pr test
